@@ -7,34 +7,87 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-enum PublicationStatus { DRAFT IN_REVIEW VALIDATED TO_PUBLISH PUBLISHED VISIT_REQUESTED VISIT_SCHEDULED VISIT_COMPLETED RENTAL_IN_PROGRESS RENTED ARCHIVED REJECTED }
-enum VisitStatus { PENDING FASTHOME_APPROVED OWNER_APPROVED CONFIRMED COMPLETED CANCELLED DECLINED }
-enum ContractStatus { DRAFT AWAITING_SIGNATURES DOCUMENTS_UPLOADED ACTIVE EXPIRED TERMINATED }
-enum ContractRole { TENANT OWNER }
-enum PaymentStatus { UPCOMING PAID PARTIAL OVERDUE CANCELLED }
-enum PaymentMethod { CASH BANK_TRANSFER MOBILE_MONEY OTHER }
+enum PublicationStatus {
+  DRAFT
+  IN_REVIEW
+  VALIDATED
+  TO_PUBLISH
+  PUBLISHED
+  VISIT_REQUESTED
+  VISIT_SCHEDULED
+  VISIT_COMPLETED
+  RENTAL_IN_PROGRESS
+  RENTED
+  ARCHIVED
+  REJECTED
+}
 
-enum NotificationType { SYSTEM PUBLICATION VISIT CONTRACT PAYMENT }
+enum VisitStatus {
+  PENDING
+  FASTHOME_APPROVED
+  OWNER_APPROVED
+  CONFIRMED
+  COMPLETED
+  CANCELLED
+  DECLINED
+}
+
+enum ContractStatus {
+  DRAFT
+  AWAITING_SIGNATURES
+  DOCUMENTS_UPLOADED
+  ACTIVE
+  EXPIRED
+  TERMINATED
+}
+
+enum ContractRole {
+  TENANT
+  OWNER
+}
+
+enum PaymentStatus {
+  UPCOMING
+  PAID
+  PARTIAL
+  OVERDUE
+  CANCELLED
+}
+
+enum PaymentMethod {
+  CASH
+  BANK_TRANSFER
+  MOBILE_MONEY
+  OTHER
+}
+
+enum NotificationType {
+  SYSTEM
+  PUBLICATION
+  VISIT
+  CONTRACT
+  PAYMENT
+}
 
 model User {
-  id           String       @id @default(cuid())
-  fullName     String
-  email        String?      @unique
-  phone        String       @unique
-  passwordHash String
-  avatarUrl    String?
-  isActive     Boolean      @default(true)
-  createdAt    DateTime     @default(now())
-  updatedAt    DateTime     @updatedAt
-  properties   Property[]   @relation("OwnerProperties")
-  visits       Visit[]      @relation("RequesterVisits")
-  agentVisits  Visit[]      @relation("AgentVisits")
-  contracts    Contract[]
-  auditLogs    AuditLog[]
-  favorites    Favorite[]
-  notifications Notification[]
-  sentMessages Message[]    @relation("SentMessages")
-  receivedMessages Message[] @relation("ReceivedMessages")
+  id                String         @id @default(cuid())
+  fullName          String
+  email             String?        @unique
+  phone             String         @unique
+  passwordHash      String
+  avatarUrl         String?
+  isActive          Boolean        @default(true)
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+  properties        Property[]     @relation("OwnerProperties")
+  visits            Visit[]        @relation("RequesterVisits")
+  agentVisits       Visit[]        @relation("AgentVisits")
+  contracts         Contract[]
+  auditLogs         AuditLog[]
+  favorites         Favorite[]
+  notifications    Notification[]
+  sentMessages      Message[]      @relation("SentMessages")
+  receivedMessages  Message[]      @relation("ReceivedMessages")
 }
 
 model Property {
@@ -48,8 +101,8 @@ model Property {
   commune       String
   neighborhood   String
   exactAddress   String?
-  latitude      Float?
-  longitude     Float?
+  latitude       Float?
+  longitude      Float?
   bedrooms       Int               @default(0)
   livingRooms    Int               @default(0)
   bathrooms      Int               @default(0)
@@ -68,8 +121,8 @@ model Property {
   owner          User              @relation("OwnerProperties", fields: [ownerId], references: [id])
   photos         PropertyPhoto[]
   visits         Visit[]
-  contracts     Contract[]
-  favorites     Favorite[]
+  contracts      Contract[]
+  favorites      Favorite[]
   createdAt      DateTime          @default(now())
   updatedAt      DateTime          @updatedAt
 }
@@ -94,57 +147,57 @@ model Favorite {
 }
 
 model Visit {
-  id             String      @id @default(cuid())
-  propertyId     String
-  requesterId    String
-  agentId        String?
-  preferredDate  DateTime
-  preferredTime  String
-  status         VisitStatus @default(PENDING)
-  fastHomeApproved Boolean   @default(false)
-  ownerApproved  Boolean     @default(false)
-  notes          String?
-  property       Property    @relation(fields: [propertyId], references: [id])
-  requester      User        @relation("RequesterVisits", fields: [requesterId], references: [id])
-  agent          User?       @relation("AgentVisits", fields: [agentId], references: [id])
-  createdAt      DateTime    @default(now())
-  updatedAt      DateTime    @updatedAt
+  id                String      @id @default(cuid())
+  propertyId        String
+  requesterId       String
+  agentId           String?
+  preferredDate     DateTime
+  preferredTime     String
+  status            VisitStatus @default(PENDING)
+  fastHomeApproved  Boolean     @default(false)
+  ownerApproved     Boolean     @default(false)
+  notes             String?
+  property          Property    @relation(fields: [propertyId], references: [id])
+  requester         User        @relation("RequesterVisits", fields: [requesterId], references: [id])
+  agent             User?       @relation("AgentVisits", fields: [agentId], references: [id])
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
 }
 
 model Contract {
-  id                 String         @id @default(cuid())
-  reference          String         @unique
-  propertyId         String
-  partyId            String
-  role               ContractRole
-  status             ContractStatus @default(DRAFT)
-  startDate          DateTime
-  endDate            DateTime
-  amount             Decimal        @db.Decimal(12,2)
-  qrToken            String         @unique
-  signedDocumentUrl  String?
-  property           Property       @relation(fields: [propertyId], references: [id])
-  party              User           @relation(fields: [partyId], references: [id])
-  payments           Payment[]
-  createdAt          DateTime       @default(now())
-  updatedAt          DateTime       @updatedAt
+  id                String         @id @default(cuid())
+  reference         String         @unique
+  propertyId        String
+  partyId           String
+  role              ContractRole
+  status            ContractStatus @default(DRAFT)
+  startDate         DateTime
+  endDate           DateTime
+  amount            Decimal        @db.Decimal(12,2)
+  qrToken           String         @unique
+  signedDocumentUrl String?
+  property          Property       @relation(fields: [propertyId], references: [id])
+  party             User           @relation(fields: [partyId], references: [id])
+  payments          Payment[]
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
 }
 
 model Payment {
-  id             String        @id @default(cuid())
+  id             String         @id @default(cuid())
   contractId     String
   dueDate        DateTime
-  expectedAmount Decimal       @db.Decimal(12,2)
-  paidAmount     Decimal       @default(0) @db.Decimal(12,2)
-  paidAt        DateTime?
+  expectedAmount Decimal        @db.Decimal(12,2)
+  paidAmount     Decimal        @default(0) @db.Decimal(12,2)
+  paidAt         DateTime?
   reference      String?
   method         PaymentMethod?
   proofUrl       String?
-  status         PaymentStatus @default(UPCOMING)
+  status         PaymentStatus  @default(UPCOMING)
   comment        String?
-  contract       Contract      @relation(fields: [contractId], references: [id])
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
+  contract       Contract       @relation(fields: [contractId], references: [id])
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
 }
 
 model Notification {
@@ -160,14 +213,14 @@ model Notification {
 }
 
 model Message {
-  id         String   @id @default(cuid())
+  id         String    @id @default(cuid())
   senderId   String
   receiverId String
   body       String
   readAt     DateTime?
-  createdAt  DateTime @default(now())
-  sender     User     @relation("SentMessages", fields: [senderId], references: [id])
-  receiver   User     @relation("ReceivedMessages", fields: [receiverId], references: [id])
+  createdAt  DateTime  @default(now())
+  sender     User      @relation("SentMessages", fields: [senderId], references: [id])
+  receiver   User      @relation("ReceivedMessages", fields: [receiverId], references: [id])
   @@index([senderId, receiverId, createdAt])
 }
 
