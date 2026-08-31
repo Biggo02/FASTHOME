@@ -1,16 +1,22 @@
 import { NextRequest } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { fail, ok, requiredString } from '@/lib/api';
+import { canAccessContract, requireSession } from '@/lib/authorization';
 
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const actorId = requireSession(request);
+    if (typeof actorId !== 'string') return actorId;
     const { id } = await params;
     const body = await request.json();
-    const actorId = requiredString(body.actorId, 'actorId');
+    const action = requiredString(body.action, 'action');
+    const access = await canAccessContract(actorId, id);
+    if (!access.found) return fail('Contrat introuvable.', 404);
+    if (!access.allowed) return fail('Accès au contrat non autorisé.', 403);
     const contract = await prisma.contract.findUnique({ where: { id }, include: { property: true } });
     if (!contract) return fail('Contrat introuvable.', 404);
 
-    if (body.action === 'UPLOAD_SIGNED_DOCUMENT') {
+    if (action === 'UPLOAD_SIGNED_DOCUMENT') {
       const documentUrl = requiredString(body.documentUrl, 'documentUrl');
       const updated = await prisma.contract.update({ where: { id }, data: { signedDocumentUrl: documentUrl, status: 'DOCUMENTS_UPLOADED' } });
       const siblings = await prisma.contract.findMany({ where: { propertyId: contract.propertyId } });
@@ -22,15 +28,11 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       await prisma.auditLog.create({ data: { actorId, action: 'SIGNED_CONTRACT_UPLOADED', entity: 'Contract', entityId: id, metadata: { propertyId: contract.propertyId } } });
       return ok(updated);
     }
-
-    if (body.action === 'TERMINATE') {
+    if (action === 'TERMINATE') {
       const updated = await prisma.contract.update({ where: { id }, data: { status: 'TERMINATED' } });
       await prisma.auditLog.create({ data: { actorId, action: 'CONTRACT_TERMINATED', entity: 'Contract', entityId: id } });
       return ok(updated);
     }
     return fail('Action invalide.', 400);
-  } catch (error) {
-    console.error(error);
-    return fail(error instanceof Error ? error.message : 'Mise à jour du contrat impossible.', 400);
-  }
+  } catch (error) { console.error(error); return fail(error instanceof Error ? error.message : 'Mise à jour du contrat impossible.', 400); }
 }
