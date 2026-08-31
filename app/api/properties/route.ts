@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { fail, ok, requiredNumber, requiredString } from '@/lib/api';
+import { requireSession } from '@/lib/authorization';
 
 export async function GET(request: NextRequest) {
   try {
@@ -24,15 +25,7 @@ export async function GET(request: NextRequest) {
       orderBy: { createdAt: 'desc' },
     });
 
-    return ok(properties.map((p) => ({
-      ...p,
-      ownerRent: undefined,
-      fasthomeMargin: undefined,
-      tenantRent: undefined,
-      exactAddress: undefined,
-      latitude: undefined,
-      longitude: undefined,
-    })));
+    return ok(properties.map((p) => ({ ...p, ownerRent: undefined, fasthomeMargin: undefined, tenantRent: undefined, exactAddress: undefined, latitude: undefined, longitude: undefined })));
   } catch (error) {
     console.error(error);
     return fail('Impossible de récupérer les biens.', 500);
@@ -41,8 +34,10 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    const auth = await requireSession(request);
+    if (typeof auth !== 'string') return auth;
+    const ownerId = auth;
     const body = await request.json();
-    const ownerId = requiredString(body.ownerId, 'ownerId');
     const title = requiredString(body.title, 'title');
     const type = requiredString(body.type, 'type');
     const description = requiredString(body.description, 'description');
@@ -54,7 +49,7 @@ export async function POST(request: NextRequest) {
     const margin = requiredNumber(body.fasthomeMargin ?? 0, 'fasthomeMargin');
 
     const owner = await prisma.user.findUnique({ where: { id: ownerId } });
-    if (!owner) return fail('Utilisateur propriétaire introuvable.', 404);
+    if (!owner || !owner.isActive) return fail('Utilisateur propriétaire introuvable.', 404);
 
     const count = await prisma.property.count();
     const reference = `FAST-BIEN-${String(count + 1).padStart(6, '0')}`;
@@ -62,18 +57,12 @@ export async function POST(request: NextRequest) {
       data: {
         reference, title, type, description, province, city, commune, neighborhood,
         exactAddress: body.exactAddress || null,
-        latitude: body.latitude == null ? null : Number(body.latitude),
-        longitude: body.longitude == null ? null : Number(body.longitude),
-        bedrooms: Number(body.bedrooms ?? 0), livingRooms: Number(body.livingRooms ?? 0),
-        bathrooms: Number(body.bathrooms ?? 0), toilets: Number(body.toilets ?? 0),
-        floor: body.floor == null ? null : Number(body.floor),
-        parking: Boolean(body.parking), water: Boolean(body.water), electricity: Boolean(body.electricity),
-        security: Boolean(body.security), furnished: Boolean(body.furnished),
-        ownerRent, fasthomeMargin: margin, tenantRent: ownerRent + margin,
-        status: 'IN_REVIEW', ownerId,
+        latitude: body.latitude == null ? null : Number(body.latitude), longitude: body.longitude == null ? null : Number(body.longitude),
+        bedrooms: Number(body.bedrooms ?? 0), livingRooms: Number(body.livingRooms ?? 0), bathrooms: Number(body.bathrooms ?? 0), toilets: Number(body.toilets ?? 0), floor: body.floor == null ? null : Number(body.floor),
+        parking: Boolean(body.parking), water: Boolean(body.water), electricity: Boolean(body.electricity), security: Boolean(body.security), furnished: Boolean(body.furnished),
+        ownerRent, fasthomeMargin: margin, tenantRent: ownerRent + margin, status: 'IN_REVIEW', ownerId,
       },
     });
-
     await prisma.auditLog.create({ data: { actorId: ownerId, action: 'PROPERTY_SUBMITTED', entity: 'Property', entityId: property.id, metadata: { reference } } });
     return ok(property, 201);
   } catch (error) {
