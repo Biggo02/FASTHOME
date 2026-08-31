@@ -3,17 +3,18 @@ import { prisma } from '@/lib/prisma';
 import { verifySession } from '@/lib/auth';
 import { fail } from '@/lib/api';
 
-export function sessionUserId(request: NextRequest) {
-  return verifySession(request.cookies.get('fasthome_session')?.value);
+export function sessionUserId(request: NextRequest): string | null {
+  const session = verifySession(request.cookies.get('fasthome_session')?.value);
+  return session?.userId ?? null;
 }
 
-export function requireSession(request: NextRequest) {
+export function requireSession(request: NextRequest): string | Response {
   const userId = sessionUserId(request);
   if (!userId) return fail('Session non authentifiée.', 401);
   return userId;
 }
 
-export function isAdmin(userId: string) {
+export function isAdmin(userId: string): boolean {
   return (process.env.FASTHOME_ADMIN_USER_IDS || '')
     .split(',')
     .map((v) => v.trim())
@@ -21,7 +22,7 @@ export function isAdmin(userId: string) {
     .includes(userId);
 }
 
-export async function requireAdmin(request: NextRequest) {
+export async function requireAdmin(request: NextRequest): Promise<string | Response> {
   const userId = sessionUserId(request);
   if (!userId) return fail('Session non authentifiée.', 401);
   if (!isAdmin(userId)) return fail('Permission administrateur requise.', 403);
@@ -29,7 +30,21 @@ export async function requireAdmin(request: NextRequest) {
 }
 
 export async function canAccessContract(userId: string, contractId: string) {
-  const contract = await prisma.contract.findUnique({ where: { id: contractId }, select: { partyId: true, property: { select: { ownerId: true } } } });
+  const contract = await prisma.contract.findUnique({
+    where: { id: contractId },
+    select: {
+      partyId: true,
+      property: { select: { ownerId: true } },
+    },
+  });
+
   if (!contract) return { allowed: false, found: false };
-  return { allowed: contract.partyId === userId || contract.property.ownerId === userId || isAdmin(userId), found: true };
+
+  return {
+    allowed:
+      contract.partyId === userId ||
+      contract.property.ownerId === userId ||
+      isAdmin(userId),
+    found: true,
+  };
 }
