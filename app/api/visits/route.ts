@@ -1,17 +1,25 @@
 import { NextRequest } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { fail, ok, requiredString } from '@/lib/api';
+import { isAdmin, requireSession } from '@/lib/authorization';
 
 export async function GET(request: NextRequest) {
   try {
-    const { searchParams } = new URL(request.url);
-    const requesterId = searchParams.get('requesterId');
-    const agentId = searchParams.get('agentId');
+    const userId = requireSession(request);
+    if (typeof userId !== 'string') return userId;
+    const requestedRequester = new URL(request.url).searchParams.get('requesterId');
+    const requestedAgent = new URL(request.url).searchParams.get('agentId');
+    const requestedProperty = new URL(request.url).searchParams.get('propertyId');
+    if ((requestedRequester && requestedRequester !== userId) || (requestedAgent && requestedAgent !== userId)) {
+      return fail('Accès aux visites non autorisé.', 403);
+    }
+
+    const where = isAdmin(userId)
+      ? { ...(requestedRequester ? { requesterId: requestedRequester } : {}), ...(requestedAgent ? { agentId: requestedAgent } : {}), ...(requestedProperty ? { propertyId: requestedProperty } : {}) }
+      : { ...(requestedRequester ? { requesterId: requestedRequester } : { requesterId: userId }), ...(requestedAgent ? { agentId: requestedAgent } : {}), ...(requestedProperty ? { propertyId: requestedProperty } : {}) };
+
     const visits = await prisma.visit.findMany({
-      where: {
-        ...(requesterId ? { requesterId } : {}),
-        ...(agentId ? { agentId } : {}),
-      },
+      where: isAdmin(userId) ? where : { OR: [where, { property: { ownerId: userId }, ...(requestedProperty ? { propertyId: requestedProperty } : {}) }] },
       include: { property: { include: { photos: { where: { isPrimary: true } } } }, requester: { select: { id: true, fullName: true } }, agent: { select: { id: true, fullName: true } } },
       orderBy: { preferredDate: 'asc' },
     });
@@ -24,9 +32,10 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    const requesterId = requireSession(request);
+    if (typeof requesterId !== 'string') return requesterId;
     const body = await request.json();
     const propertyId = requiredString(body.propertyId, 'propertyId');
-    const requesterId = requiredString(body.requesterId, 'requesterId');
     const date = requiredString(body.preferredDate, 'preferredDate');
     const preferredTime = requiredString(body.preferredTime, 'preferredTime');
 
