@@ -7,9 +7,9 @@ function contractReference(year: number, sequence: number) {
   return `FAST-CTR-${year}-${String(sequence).padStart(6, '0')}`;
 }
 
-async function nextReference(year: number) {
+async function nextReference(year: number, offset = 0) {
   const count = await prisma.contract.count({ where: { createdAt: { gte: new Date(`${year}-01-01T00:00:00.000Z`), lt: new Date(`${year + 1}-01-01T00:00:00.000Z`) } } });
-  return contractReference(year, count + 1);
+  return contractReference(year, count + 1 + offset);
 }
 
 export async function GET(request: NextRequest) {
@@ -41,7 +41,7 @@ export async function POST(request: NextRequest) {
     const startDate = new Date(body.startDate || Date.now());
     const endDate = new Date(body.endDate || new Date(startDate.getTime() + 365 * 24 * 60 * 60 * 1000));
     const tenantReference = await nextReference(year);
-    const ownerReference = await nextReference(year);
+    const ownerReference = await nextReference(year, 1);
     const tenant = await prisma.contract.create({ data: { reference: tenantReference, propertyId: visit.propertyId, partyId: visit.requesterId, role: 'TENANT', status: 'AWAITING_SIGNATURES', startDate, endDate, amount: visit.property.tenantRent, qrToken: randomBytes(24).toString('hex') } });
     const owner = await prisma.contract.create({ data: { reference: ownerReference, propertyId: visit.propertyId, partyId: visit.property.ownerId, role: 'OWNER', status: 'AWAITING_SIGNATURES', startDate, endDate, amount: visit.property.ownerRent, qrToken: randomBytes(24).toString('hex') } });
 
